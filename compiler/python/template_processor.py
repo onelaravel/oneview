@@ -19,7 +19,7 @@ class TemplateProcessor:
         self.watch_counter = 0  # Counter for generating unique watch IDs
         self._is_typescript = is_typescript
         self.conditional_handlers = ConditionalHandlers(self.state_variables, self)
-        self.loop_handlers = LoopHandlers(self.state_variables, self)
+        self.loop_handlers = LoopHandlers(self.state_variables, self, is_typescript)
         self.section_handlers = SectionHandlers()
         self.template_processors = TemplateProcessors()
         self.directive_processors = DirectiveProcessor()

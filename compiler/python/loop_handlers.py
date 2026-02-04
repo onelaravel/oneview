@@ -8,9 +8,10 @@ from utils import extract_balanced_parentheses
 import re
 
 class LoopHandlers:
-    def __init__(self, state_variables=None, processor=None):
+    def __init__(self, state_variables=None, processor=None, is_typescript=False):
         self.state_variables = state_variables or set()
         self.processor = processor
+        self._is_typescript = is_typescript
     
     def _extract_variables(self, expr):
         """Extract variable names from expression, excluding method names after dot notation"""
@@ -48,10 +49,16 @@ class LoopHandlers:
                     if as_match.group(3):  # Has key => value
                         key_var = first_var
                         value_var = as_match.group(4)
-                        callback = f'({value_var}, {key_var}, __loopIndex, __loop) => `'
+                        if self._is_typescript:
+                            callback = f'({value_var}: any, {key_var}: any, __loopIndex: any, __loop: any) => `'
+                        else:
+                            callback = f'({value_var}, {key_var}, __loopIndex, __loop) => `'
                     else:  # Only value
                         value_var = first_var
-                        callback = f'({value_var}, __loopKey, __loopIndex, __loop) => `'
+                        if self._is_typescript:
+                            callback = f'({value_var}: any, __loopKey: any, __loopIndex: any, __loop: any) => `'
+                        else:
+                            callback = f'({value_var}, __loopKey, __loopIndex, __loop) => `'
                     
                     # Extract variables from array expression
                     variables = self._extract_variables(array_expr)
@@ -122,7 +129,10 @@ class LoopHandlers:
                     for_logic = f"let __forOutputContent__ = ``;\nfor (let {var_name} = {start_value}; {var_name} {operator} {end_value}; {var_name}++) {{__loop.setCurrentTimes({var_name});"
                     
                     # Wrap in __for() with __loop parameter
-                    for_call = f"this.__for('increment', {start_value}, {end_value}, (__loop) => {{\n{for_logic}"
+                    if self._is_typescript:
+                        for_call = f"this.__for('increment', {start_value}, {end_value}, (__loop: any) => {{\n{for_logic}"
+                    else:
+                        for_call = f"this.__for('increment', {start_value}, {end_value}, (__loop) => {{\n{for_logic}"
                     
                     # Only wrap with __watch for block-level directives (not attributes)
                     has_watch = not is_attribute_context and watch_keys

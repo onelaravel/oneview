@@ -215,6 +215,7 @@ class BladeCompiler:
         # Update TemplateProcessor with TypeScript flag after we know the language
         self.template_processor._is_typescript = self._is_typescript
         self.template_processor.echo_processor._is_typescript = self._is_typescript
+        self.template_processor.loop_handlers._is_typescript = self._is_typescript
         self.function_generators._is_typescript = self._is_typescript
         
         # NEW: Use DeclarationTracker to parse all declarations in order
