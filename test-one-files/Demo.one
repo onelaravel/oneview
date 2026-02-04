@@ -1,0 +1,36 @@
+@useState($isOpen, false)
+@const($API_URL = '/api')
+
+<blade>
+<div class="demo" @click($setIsOpen(!$isOpen))>
+    <h2>{{ $isOpen ? 'Open' : 'Closed' }}</h2>
+    <p v-if="$isOpen">
+        This is demo content
+    </p>
+</div>
+</blade>
+
+<script setup>
+export default {
+    toggle() {
+        this.setIsOpen(!this.isOpen);
+    },
+    
+    init() {
+        console.log('Demo view initialized');
+    }
+}
+</script>
+
+<style scoped>
+.demo {
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.demo:hover {
+    background-color: #f5f5f5;
+}
+</style>

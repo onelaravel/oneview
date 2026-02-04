@@ -1,0 +1,19 @@
+@useState($test, 'hello')
+@let($count, 0)
+
+<blade>
+<div>
+    <p>{{ $test }}</p>
+    <p>Count: {{ $count }}</p>
+    <button @click($setTest('world'))>Change</button>
+</div>
+</blade>
+
+<script setup lang="typescript">
+export default {
+    setupLang: 'typescript',
+    change() {
+        this.setTest('changed');
+    }
+}
+</script>

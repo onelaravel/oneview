@@ -1,0 +1,19 @@
+{
+  "name": "@oneview/compiler",
+  "version": "1.0.0",
+  "description": "OneView template compiler - Transforms .one files to Blade and JavaScript",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": [
+    "oneview",
+    "compiler",
+    "blade",
+    "javascript",
+    "template"
+  ],
+  "license": "MIT"
+}
+

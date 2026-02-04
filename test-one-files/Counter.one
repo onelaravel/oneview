@@ -1,0 +1,33 @@
+@useState($count, 0)
+@let($temp, 100)
+
+<blade>
+<div class="counter">
+    <h3>Count: {{ $count }}</h3>
+    <button @click($setCount($count + 1))>Increment</button>
+    <button @click($setCount($count - 1))>Decrement</button>
+</div>
+</blade>
+
+<script setup>
+export default {
+    increment() {
+        this.setCount(this.count + 1);
+    },
+    decrement() {
+        this.setCount(this.count - 1);
+    }
+}
+</script>
+
+<style scoped>
+.counter {
+    text-align: center;
+    padding: 20px;
+}
+
+button {
+    margin: 0 5px;
+    padding: 10px 20px;
+}
+</style>

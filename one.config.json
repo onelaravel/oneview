@@ -1,0 +1,33 @@
+{
+  "root": ".",
+  "paths": {
+    "resources": ".",
+    "oneView": "test-one-files",
+    "bladeView": "test-output/views",
+    "temp": "test-output/temp"
+  },
+  "output": {
+    "contexts": {
+      "web": {
+        "blade": "test-output/views",
+        "app": "test-output/js"
+      }
+    }
+  },
+  "contexts": {
+    "web": {
+      "name": "web",
+      "app": ["test-output/app"],
+      "views": {
+        "web": "."
+      },
+      "blade": {
+        "web": "."
+      },
+      "temp": {
+        "views": "test-output/temp/views",
+        "registry": "test-output/temp/registry.js"
+      }
+    }
+  }
+}

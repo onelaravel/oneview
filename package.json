@@ -1,0 +1,130 @@
+{
+  "name": "oneview",
+  "version": "1.1.0",
+  "description": "OneView - Modern TypeScript Framework for Laravel. Reactive SPAs with TypeScript-first approach.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "one-compile": "./compiler/cli.js",
+    "one-build": "./compiler/build-cli.js",
+    "one-dev": "./compiler/dev-cli.js",
+    "onejs-build": "./compiler/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins.d.ts",
+      "import": "./dist/plugins.js",
+      "require": "./dist/plugins.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js",
+      "require": "./dist/core/index.js"
+    },
+    "./compiler": {
+      "import": "./compiler/index.js",
+      "require": "./compiler/index.js"
+    },
+    "./vite": {
+      "import": "./compiler/vite-plugin.js",
+      "require": "./compiler/vite-plugin.js"
+    },
+    "./webpack": {
+      "import": "./compiler/webpack-plugin.js",
+      "require": "./compiler/webpack-plugin.js"
+    },
+    "./webpack-loader": {
+      "import": "./compiler/webpack-loader.js",
+      "require": "./compiler/webpack-loader.js"
+    },
+    "./alias": {
+      "import": "./compiler/alias-plugin.js",
+      "require": "./compiler/alias-plugin.js"
+    }
+  },
+  "files": [
+    "dist",
+    "compiler",
+    "index.js",
+    "index.d.ts",
+    "plugins.js",
+    "plugins.d.ts",
+    "package.json",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onelaravel/oneview.git"
+  },
+  "bugs": {
+    "url": "https://github.com/onelaravel/oneview/issues"
+  },
+  "homepage": "https://onelaravel.com",
+  "scripts": {
+    "build": "npm run clean && npm run build:ts && npm run post-build",
+    "build:ts": "tsc",
+    "post-build": "node scripts/post-build.js || true",
+    "postinstall": "node -e \"try{const fs=require('fs');fs.chmodSync('compiler/cli.js',0o755);fs.chmodSync('compiler/build-cli.js',0o755);fs.chmodSync('compiler/dev-cli.js',0o755)}catch(e){}\"",
+    "build:views": "node compiler/index.js all",
+    "build:views:web": "node compiler/index.js web",
+    "build:views:admin": "node compiler/index.js admin",
+    "build:views:mobile": "node compiler/index.js mobile",
+    "build:views:watch": "node compiler/index.js all --watch",
+    "build:watch": "tsc --watch",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "test": "npm run type-check && npm run test:compiler",
+    "test:compiler": "node compiler/test.js",
+    "prepublishOnly": "npm run build && npm run type-check",
+    "preversion": "npm run build && npm run type-check",
+    "version": "npm run build"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "chokidar": "^3.5.3",
+    "esbuild": "^0.20.0"
+  },
+  "dependencies": {},
+  "optionalDependencies": {
+    "chokidar": "^3.5.3"
+  },
+  "keywords": [
+    "framework",
+    "laravel",
+    "spa",
+    "single-page-application",
+    "javascript",
+    "typescript",
+    "reactive",
+    "view-engine",
+    "compiler",
+    "modern",
+    "es-modules",
+    "mvc",
+    "mvvm",
+    "state-management",
+    "routing"
+  ],
+  "author": {
+    "name": "OneLaravel",
+    "url": "https://onelaravel.com"
+  },
+  "maintainers": [
+    {
+      "name": "OneLaravel Team",
+      "url": "https://onelaravel.com"
+    }
+  ],
+  "license": "MIT"
+}
