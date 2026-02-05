@@ -1344,15 +1344,15 @@ class DirectiveParsers:
         
         # Handle variables and concatenation: $theme.'.layout', $abc.'.def'.$Abxy
         elif '.' in view_expr and ('$' in view_expr or '"' in view_expr or "'" in view_expr):
-            # Has concatenation - convert to template literal with View.execute
+            # Has concatenation - convert to template literal with App.Helper.execute
             js_expr = self._convert_php_string_concat(view_expr)
-            return f"View.execute(() => `{js_expr}`)"
+            return f"App.Helper.execute(() => `{js_expr}`)"
         
         # Handle simple variables: $theme
         else:
             # Check if it contains undefined variables (starts with $ and not in declared vars)
             if view_expr.startswith('$') and not self._is_variable_declared(view_expr):
-                return f"View.execute(() => {php_to_js(view_expr)})"
+                return f"App.Helper.execute(() => {php_to_js(view_expr)})"
             else:
                 return php_to_js(view_expr)
 

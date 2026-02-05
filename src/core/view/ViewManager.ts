@@ -5,7 +5,7 @@
 
 import type { ViewConfig, ViewProps } from '../types/index.js';
 import type { ActiveRoute } from '../routers/Router.js';
-import { ViewBase } from './ViewBase.js';
+import { View } from './View.js';
 import { viewLoader } from './ViewLoader.js';
 import { ViewController } from './ViewController.js';
 import { EventService } from '../services/EventService.js';
@@ -15,7 +15,7 @@ import { OneDOM } from '../dom/OneDOM.js';
 export interface ViewInstance {
     id: string;
     name: string;
-    view: ViewBase;
+    view: View;
     container: HTMLElement;
     config: ViewConfig;
 }
@@ -23,8 +23,8 @@ export interface ViewInstance {
 export interface LoadResult {
     html: string | null;
     error: string | null;
-    superView: ViewBase | null;
-    ultraView: ViewBase | null;
+    superView: View | null;
+    ultraView: View | null;
     isSuperView: boolean;
     needInsert: boolean;
     isCached: boolean;
@@ -38,7 +38,7 @@ export class ViewManager {
     
     // View templates registry (V1 compatibility)
     public templates: Record<string, any> = {};
-    public Engine: typeof ViewBase = ViewBase;
+    public Engine: typeof View = View;
     
     // View registry (V2 - ESM imports mapped to view names)
     // Supports both sync factory functions and async imports
@@ -46,13 +46,13 @@ export class ViewManager {
     
     // V1 compatibility
     public App: any = null;
-    public CURRENT_SUPER_VIEW: ViewBase | null = null;
+    public CURRENT_SUPER_VIEW: View | null = null;
     public CURRENT_SUPER_VIEW_PATH: string | null = null;
     public CURRENT_SUPER_VIEW_MOUNTED: boolean = false;
-    public PAGE_VIEW: ViewBase | null = null;
-    public VIEW_MOUNTED_QUEUE: ViewBase[][] = [];
-    public ALL_VIEW_STACK: ViewBase[] = [];
-    public SUPER_VIEW_STACK: ViewBase[] = [];
+    public PAGE_VIEW: View | null = null;
+    public VIEW_MOUNTED_QUEUE: View[][] = [];
+    public ALL_VIEW_STACK: View[] = [];
+    public SUPER_VIEW_STACK: View[] = [];
     public renderTimes: number = -1;
     
     // SSR support
@@ -224,10 +224,10 @@ export class ViewManager {
             }
 
             this.PAGE_VIEW = view;
-            let superView: ViewBase | null = null;
+            let superView: View | null = null;
             let superViewPath: string | null = null;
             let result: any;
-            let ultraView: ViewBase = view;
+            let ultraView: View = view;
             let renderIndex = 0;
             let currentView: any = view;
 
@@ -239,7 +239,7 @@ export class ViewManager {
                         superViewPath = currentView.__.superViewPath;
                         result = this.renderOrScanView(currentView, null, 'csr');
                         currentView = result;
-                        if (currentView && typeof currentView === 'object' && currentView instanceof ViewBase) {
+                        if (currentView && typeof currentView === 'object' && currentView instanceof View) {
                             (currentView as any).__.setIsSuperView?.(true);
                             superView = currentView;
                             ultraView = currentView;
@@ -254,7 +254,7 @@ export class ViewManager {
                         if (currentView.__.hasSuperView) {
                             result = this.renderOrScanView(currentView, renderIndex > 0 ? currentView.data : null, 'csr');
                             currentView = result;
-                            if (currentView && typeof currentView === 'object' && currentView instanceof ViewBase) {
+                            if (currentView && typeof currentView === 'object' && currentView instanceof View) {
                                 (currentView as any).__.setIsSuperView?.(true);
                                 superView = currentView;
                                 ultraView = currentView;
@@ -279,7 +279,7 @@ export class ViewManager {
                     };
                 }
                 renderIndex++;
-            } while (result && typeof result === 'object' && result instanceof ViewBase);
+            } while (result && typeof result === 'object' && result instanceof View);
 
             let html = result as string;
             const needInsert = !(superViewPath && superViewPath === this.CURRENT_SUPER_VIEW_PATH);
@@ -431,10 +431,10 @@ export class ViewManager {
 
             this.PAGE_VIEW = view;
             
-            let superView: ViewBase | null = null;
+            let superView: View | null = null;
             let superViewPath: string | null = null;
             let result: any;
-            let ultraView: ViewBase = view;
+            let ultraView: View = view;
             let renderIndex = 0;
 
             // Loop to handle nested layouts
@@ -497,7 +497,7 @@ export class ViewManager {
                     };
                 }
                 renderIndex++;
-            } while (result && typeof result === 'object' && result instanceof ViewBase);
+            } while (result && typeof result === 'object' && result instanceof View);
 
             // Determine if we need to insert HTML
             const needInsert = !(superViewPath && superViewPath === this.CURRENT_SUPER_VIEW_PATH);
@@ -897,7 +897,7 @@ export class ViewManager {
      * @param data - View data
      * @returns View instance or null
      */
-    view(name: string, data: any = null): ViewBase | null {
+    view(name: string, data: any = null): View | null {
         try {
             // Check if view exists in templates
             if (!this.templates[name]) {
@@ -976,9 +976,9 @@ export class ViewManager {
             return view;
         }
 
-        // If view is a ViewBase instance, call its render method
+        // If view is a View instance, call its render method
         if (view && typeof view === 'object') {
-            // TODO: Implement render() method in ViewBase/ViewController
+            // TODO: Implement render() method in View/ViewController
             return '';
         }
 

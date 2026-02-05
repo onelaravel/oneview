@@ -95,10 +95,25 @@ class BladeCompiler:
         blade_code = re.sub(verbatim_pattern, protect_verbatim_block, blade_code, flags=re.DOTALL | re.IGNORECASE)
         
         # ========================================================================
-        # PRIORITY 2: Process @register/@endregister blocks BEFORE escaping backticks
         # ========================================================================
-        # @register blocks are processed AFTER @verbatim to ensure @register inside
-        # @verbatim is NOT processed. This protects content inside @register blocks
+        # PRIORITY 2: Remove @ssr blocks (server-side only) BEFORE processing
+        # ========================================================================
+        # Everything inside @ssr should be completely skipped (including script setup)
+        # This is done AFTER @verbatim to ensure @ssr inside @verbatim is preserved
+        # Note: @ssr blocks are already removed in Node.js wrapper (compiler/index.js)
+        # but we keep this here as a safety measure for direct Python compiler usage
+        
+        # Remove @ssr...@endssr and all case variations
+        # Matches: @serverside/@endserverside, @serverSide/@endServerSide, @ssr/@endssr, 
+        #          @SSR/@endSSR, @useSSR/@enduseSSR, @useSsr/@enduseSsr, etc.
+        ssr_pattern = r'@(?:serverside|serverSide|ssr|SSR|useSSR|useSsr)\b[\s\S]*?@end(?:serverside|serverSide|ServerSide|SSR|Ssr|ssr|useSSR|useSsr)\b'
+        blade_code = re.sub(ssr_pattern, '', blade_code, flags=re.IGNORECASE)
+        
+        # ========================================================================
+        # PRIORITY 3: Process @register/@endregister blocks BEFORE escaping backticks
+        # ========================================================================
+        # @register blocks are processed AFTER @verbatim and @ssr to ensure @register inside
+        # @verbatim or @ssr is NOT processed. This protects content inside @register blocks
         # from being escaped (they contain raw JavaScript code)
         register_blocks = {}
         register_counter = 0

@@ -217,7 +217,7 @@ class Compiler {
         const fileContent = fs.readFileSync(oneFilePath, 'utf-8');
         
         // Tách các phần của .one file
-        const parts = this.parseOneFile(fileContent);
+        const parts = this.parseOneFile(fileContent, oneFilePath);
         
         // Lấy relative path để generate view path và output paths
         const relativePath = path.relative(viewsDir, oneFilePath);
@@ -257,12 +257,17 @@ class Compiler {
         this.ensureDir(path.dirname(bladePath));
         
         // GHI BLADE FILE NGAY LẬP TỨC (không đợi Python compiler)
-        // Blade file = declarations + template (KHÔNG có script/style/link)
+        // Blade file = declarations + SSR content + template (KHÔNG có script/style/link)
         let bladeContent = '';
         
         // Thêm declarations vào đầu file
         if (parts.declarations.length > 0) {
             bladeContent = parts.declarations.join('\n') + '\n\n';
+        }
+        
+        // Thêm SSR content (server-side only content)
+        if (parts.ssrContent) {
+            bladeContent += parts.ssrContent + '\n';
         }
         
         // Thêm template (parts.blade đã loại bỏ script/style khi parse)
@@ -280,7 +285,8 @@ class Compiler {
         }
         
         // Script setup (nếu có) - Python compiler sẽ parse và xử lý
-        const scriptSetupMatch = fileContent.match(/<script\s+setup[^>]*>([\s\S]*?)<\/script>/i);
+        // Extract from cleanedContent (after @ssr removal) not from original fileContent
+        const scriptSetupMatch = parts.cleanedContent.match(/<script\s+setup[^>]*>([\s\S]*?)<\/script>/i);
         
         // Detect TypeScript from lang attribute (case-insensitive)
         let isTypeScript = false;
@@ -422,13 +428,43 @@ class Compiler {
      * <script>...</script>        <- script
      * <style>...</style>         <- style
      */
-    parseOneFile(content) {
+    parseOneFile(content, oneFilePath = null) {
         const parts = {
             declarations: [],
             blade: '',
             script: '',
-            style: ''
+            style: '',
+            ssrContent: '',  // Content from @ssr blocks (for blade file only)
+            cleanedContent: ''  // Store content after @ssr removal for script extraction
         };
+
+        // ========================================================================
+        // PRIORITY 0: Extract @ssr blocks content (for blade) and prepare clean content (for JS)
+        // ========================================================================
+        // @serverSide/@endServerSide, @ssr/@endssr, @useSSR/@enduseSSR, etc.
+        // - Blade file (server-side): Include content INSIDE @ssr blocks (remove only directives)
+        // - JS file (client-side): Exclude @ssr blocks completely (remove directives + content)
+        
+        // Extract SSR content (for blade file)
+        let ssrContent = '';
+        const ssrPattern = /@(?:serverside|serverSide|ssr|SSR|useSSR|useSsr)\b([\s\S]*?)@end(?:serverside|serverSide|ServerSide|SSR|Ssr|ssr|useSSR|useSsr)\b/gi;
+        let match;
+        while ((match = ssrPattern.exec(content)) !== null) {
+            ssrContent += match[1]; // Extract content between @ssr and @endssr
+        }
+        parts.ssrContent = ssrContent.trim();
+        
+        // Remove @ssr blocks completely from content (for JS file)
+        const contentWithoutSSR = content.replace(
+            /@(?:serverside|serverSide|ssr|SSR|useSSR|useSsr)\b[\s\S]*?@end(?:serverside|serverSide|ServerSide|SSR|Ssr|ssr|useSSR|useSsr)\b/gi,
+            ''
+        );
+        
+        // Use content without SSR for all client-side processing
+        content = contentWithoutSSR;
+        
+        // Store cleaned content for later script extraction (JS file)
+        parts.cleanedContent = content;
 
         // Extract declarations (@useState, @const, @let, @var, @vars)
         // Support nested parentheses like: @let([$x, $y] = useState($data))
@@ -466,24 +502,129 @@ class Compiler {
         const awaitMatch = content.match(/@await(\s|$)/);
         const fetchMatch = content.match(/@fetch\s*\(/);
         
-        // Extract blade template
-        // Support both <blade> and <template> tags, extract only inner content
-        const bladeMatch = content.match(/<blade>([\s\S]*?)<\/blade>/i);
-        const templateMatch = content.match(/<template>([\s\S]*?)<\/template>/i);
+        // ========================================================================
+        // Extract blade/template wrapper (PRIORITY: handle nested/multiple wrappers)
+        // ========================================================================
+        // Rules:
+        // 1. If multiple nested wrappers: take level-0 (outermost) wrapper
+        // 2. If multiple level-0 wrappers: take FIRST one, remove others
+        // 3. Content inside level-0 wrapper is ALL blade content (even inner <template>/<blade> tags are HTML)
+        // 4. Script/style tags INSIDE level-0 wrapper: keep as-is (don't extract)
+        // 5. Script/style tags OUTSIDE wrapper: extract normally (unless in @ssr)
         
-        if (bladeMatch) {
-            parts.blade = bladeMatch[1].trim();
-            // Prepend @await/@fetch if they exist (they need to be in blade content for Python compiler)
-            if (awaitMatch) parts.blade = '@await\n' + parts.blade;
-            if (fetchMatch) parts.blade = fetchMatch[0] + '\n' + parts.blade;
-        } else if (templateMatch) {
-            // Extract content from <template> tag
-            parts.blade = templateMatch[1].trim();
+        let hasLevel0Wrapper = false;
+        let bladeContentFromWrapper = null;
+        
+        // Find all level-0 <blade> and <template> tags (not nested)
+        // Strategy: Parse character by character to track nesting depth
+        const findLevel0Wrappers = (text, tagName) => {
+            const wrappers = [];
+            const openTag = `<${tagName}>`;
+            const closeTag = `</${tagName}>`;
+            let pos = 0;
+            
+            while (pos < text.length) {
+                const openPos = text.indexOf(openTag, pos);
+                if (openPos === -1) break;
+                
+                // Find matching close tag by tracking depth
+                let depth = 1;
+                let searchPos = openPos + openTag.length;
+                let closePos = -1;
+                
+                while (searchPos < text.length && depth > 0) {
+                    const nextOpen = text.indexOf(openTag, searchPos);
+                    const nextClose = text.indexOf(closeTag, searchPos);
+                    
+                    if (nextClose === -1) break; // No matching close tag
+                    
+                    if (nextOpen !== -1 && nextOpen < nextClose) {
+                        // Found nested open tag
+                        depth++;
+                        searchPos = nextOpen + openTag.length;
+                    } else {
+                        // Found close tag
+                        depth--;
+                        if (depth === 0) {
+                            closePos = nextClose;
+                        }
+                        searchPos = nextClose + closeTag.length;
+                    }
+                }
+                
+                if (closePos !== -1) {
+                    // Found complete level-0 wrapper
+                    const innerContent = text.substring(openPos + openTag.length, closePos);
+                    wrappers.push({
+                        fullMatch: text.substring(openPos, closePos + closeTag.length),
+                        innerContent: innerContent,
+                        startPos: openPos,
+                        endPos: closePos + closeTag.length,
+                        tagName: tagName
+                    });
+                    pos = closePos + closeTag.length;
+                } else {
+                    // No matching close, move forward
+                    pos = openPos + openTag.length;
+                }
+            }
+            
+            return wrappers;
+        };
+        
+        // Find all level-0 <blade> tags
+        const bladeWrappers = findLevel0Wrappers(content, 'blade');
+        // Find all level-0 <template> tags
+        const templateWrappers = findLevel0Wrappers(content, 'template');
+        
+        // Combine all found wrappers
+        const allFoundWrappers = [...bladeWrappers, ...templateWrappers];
+        
+        // Filter out wrappers that are INSIDE other wrappers (keep only true level-0)
+        const trulyLevel0Wrappers = [];
+        for (const wrapper of allFoundWrappers) {
+            let isInside = false;
+            for (const other of allFoundWrappers) {
+                if (wrapper !== other) {
+                    // Check if wrapper is inside other
+                    if (wrapper.startPos > other.startPos && wrapper.endPos < other.endPos) {
+                        isInside = true;
+                        break;
+                    }
+                }
+            }
+            if (!isInside) {
+                trulyLevel0Wrappers.push(wrapper);
+            }
+        }
+        
+        // Sort by position (to get first one)
+        const allWrappers = trulyLevel0Wrappers.sort((a, b) => a.startPos - b.startPos);
+        
+        if (allWrappers.length > 0) {
+            hasLevel0Wrapper = true;
+            
+            // Take FIRST wrapper (lowest startPos)
+            const firstWrapper = allWrappers[0];
+            bladeContentFromWrapper = firstWrapper.innerContent.trim();
+            
+            // Remove ALL level-0 wrappers from content (for script/style extraction later)
+            // This ensures script/style inside wrappers are not extracted
+            let contentWithoutWrappers = content;
+            for (const wrapper of allWrappers) {
+                contentWithoutWrappers = contentWithoutWrappers.replace(wrapper.fullMatch, '');
+            }
+            content = contentWithoutWrappers;
+        }
+        
+        // Set blade content
+        if (hasLevel0Wrapper) {
+            parts.blade = bladeContentFromWrapper;
             // Prepend @await/@fetch if they exist
             if (awaitMatch) parts.blade = '@await\n' + parts.blade;
             if (fetchMatch) parts.blade = fetchMatch[0] + '\n' + parts.blade;
         } else {
-            // Nếu không có <blade> hoặc <template> wrapper, lấy toàn bộ content trừ script và style
+            // No level-0 wrapper: use old logic (extract content minus script/style)
             let tempContent = content;
             // Remove script tags
             tempContent = tempContent.replace(/<script[\s\S]*?<\/script>/gi, '');
@@ -496,17 +637,20 @@ class Compiler {
             parts.blade = tempContent.trim();
         }
 
-        // Extract script
+        // Extract script (only from content WITHOUT wrappers)
         const scriptMatch = content.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
         if (scriptMatch) {
             parts.script = scriptMatch[1].trim();
         }
 
-        // Extract style
+        // Extract style (only from content WITHOUT wrappers)
         const styleMatch = content.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
         if (styleMatch) {
             parts.style = styleMatch[1].trim();
         }
+        
+        // Store cleaned content (after removing wrappers) for script setup extraction
+        parts.cleanedContent = content;
 
         return parts;
     }

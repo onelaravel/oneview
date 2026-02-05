@@ -4,6 +4,7 @@ Handlers cho các section directives (@section, @endsection, @yield, etc.)
 
 from config import JS_FUNCTION_PREFIX
 from php_converter import php_to_js
+from utils import extract_balanced_parentheses
 import re
 
 class SectionHandlers:
@@ -12,41 +13,75 @@ class SectionHandlers:
     
     def process_section_directive(self, line, stack, output, sections):
         """Process @section directive"""
-        # Two parameter version
-        match_two = re.match(r'@section\s*\(\s*[\'"]([^\'"]*)[\'"]\s*,\s*(.*?)\s*\)', line, re.DOTALL)
-        if match_two and ',' in line:
-            section_name = match_two.group(1)
-            section_value_raw = match_two.group(2).strip()
-            
-            # Check if this is a simple string literal (no PHP concatenation or variables)
-            is_simple_string = (
-                ((section_value_raw.startswith("'") and section_value_raw.endswith("'")) or 
-                 (section_value_raw.startswith('"') and section_value_raw.endswith('"'))) and
-                # No PHP concatenation operator
-                ' .' not in section_value_raw and '. ' not in section_value_raw and
-                # No PHP variables
-                '$' not in section_value_raw
-            )
-            
-            if is_simple_string:
-                # Direct string literal - fix escaping only
-                section_value = self._ensure_proper_escaping(section_value_raw)
-            else:
-                # Complex expression with concatenation or variables - use php_to_js
-                # Do NOT call _ensure_proper_escaping after php_to_js, as it's already handled
-                section_value = php_to_js(section_value_raw) if section_value_raw else "''"
-            
-            result = '${' + JS_FUNCTION_PREFIX + '.section(\'' + section_name + '\', ' + section_value + ', \'string\')}'
-            output.append(result)
-            sections.append(result)
-            return True
+        # Use extract_balanced_parentheses to properly handle nested parentheses
+        section_pos = line.find('(')
+        if section_pos != -1:
+            section_content, end_pos = extract_balanced_parentheses(line, section_pos)
+            if section_content is not None:
+                # Parse section content - could be ('name') or ('name', value)
+                # Find the first comma that's not inside quotes or parentheses
+                first_arg_end = self._find_first_comma(section_content)
+                
+                if first_arg_end != -1:
+                    # Two parameter version: @section('name', value)
+                    section_name_raw = section_content[:first_arg_end].strip()
+                    section_value_raw = section_content[first_arg_end + 1:].strip()
+                    
+                    # Extract section name from quotes
+                    name_match = re.match(r'[\'"]([^\'"]*)[\'"]', section_name_raw)
+                    if name_match:
+                        section_name = name_match.group(1)
+                        
+                        # Check if this is a simple string literal (no PHP concatenation or variables)
+                        is_simple_string = (
+                            ((section_value_raw.startswith("'") and section_value_raw.endswith("'")) or 
+                             (section_value_raw.startswith('"') and section_value_raw.endswith('"'))) and
+                            # No PHP concatenation operator
+                            ' .' not in section_value_raw and '. ' not in section_value_raw and
+                            # No PHP variables
+                            '$' not in section_value_raw
+                        )
+                        
+                        if is_simple_string:
+                            # Direct string literal - fix escaping only
+                            section_value = self._ensure_proper_escaping(section_value_raw)
+                        else:
+                            # Complex expression with concatenation or variables - use php_to_js
+                            section_value = php_to_js(section_value_raw) if section_value_raw else "''"
+                        
+                        result = '${' + JS_FUNCTION_PREFIX + '.section(\'' + section_name + '\', ' + section_value + ', \'string\')}'
+                        output.append(result)
+                        sections.append(result)
+                        return True
+                else:
+                    # Single parameter version: @section('name')
+                    name_match = re.match(r'[\'"]([^\'"]*)[\'"]', section_content.strip())
+                    if name_match:
+                        section_name = name_match.group(1)
+                        stack.append(('section', section_name, len(output)))
+                        return True
         
-        # Single parameter version
-        match_one = re.match(r'@section\s*\(\s*[\'"]([^\'"]*)[\'"]|([^)]*)\s*\)', line)
-        if match_one:
-            section_name = match_one.group(1) or php_to_js(match_one.group(2))
-            stack.append(('section', section_name, len(output)))
-            return True
+        return False
+    
+    def _find_first_comma(self, content):
+        """Find the first comma that's not inside quotes or parentheses"""
+        depth = 0
+        in_single_quote = False
+        in_double_quote = False
+        
+        for i, char in enumerate(content):
+            if char == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+            elif char == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+            elif char == '(' and not in_single_quote and not in_double_quote:
+                depth += 1
+            elif char == ')' and not in_single_quote and not in_double_quote:
+                depth -= 1
+            elif char == ',' and depth == 0 and not in_single_quote and not in_double_quote:
+                return i
+        
+        return -1
         
         return False
     

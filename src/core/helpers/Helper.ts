@@ -30,6 +30,15 @@ export class Helper {
         };
     }
 
+    execute<T>(fn: () => T): T {
+        try {
+            return fn();
+        } catch (error) {
+            console.error('[Helper] execute error:', error);
+            return '' as unknown as T;
+        }
+    }
+
     /**
      * Generate URL with base URL
      */
@@ -54,6 +63,17 @@ export class Helper {
      */
     private escapeRegex(str: string): string {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    escapeString(str: string): string {
+        if (typeof str !== 'string') return str;
+        // escape html special characters
+        return str.replace(/\\/g, '\\\\')
+                  .replace(/'/g, "\\'")
+                  .replace(/"/g, '\\"')
+                  .replace(/\n/g, '\\n')
+                  .replace(/\r/g, '\\r')
+                  .replace(/\t/g, '\\t');
     }
 
     /**

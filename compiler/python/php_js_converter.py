@@ -42,6 +42,10 @@ class PHPToJSConverter:
                 # Restore ++ and -- operators
                 expr = expr.replace('__INC_OPERATOR__', '++')
                 expr = expr.replace('__DEC_OPERATOR__', '--')
+                # IMPORTANT: Still need to convert PHP variables and add function prefixes
+                # Remove PHP variable prefix $
+                expr = re.sub(r'\$([a-zA-Z_][a-zA-Z0-9_]*)', r'\1', expr)
+                expr = self._add_function_prefixes(expr)
                 return expr
         
         # Step 2: Convert object property access (-> to .) AFTER string concatenation
